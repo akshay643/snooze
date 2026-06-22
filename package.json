@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "gen-vapid": "web-push generate-vapid-keys"
+    "dev": "./node_modules/.bin/next dev",
+    "build": "./node_modules/.bin/next build",
+    "start": "./node_modules/.bin/next start",
+    "gen-vapid": "./node_modules/.bin/web-push generate-vapid-keys"
   },
   "dependencies": {
     "next": "14.2.15",
