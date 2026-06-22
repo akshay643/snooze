@@ -1,0 +1,146 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bot: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  height: 100%;
+  background: #08080f;
+  color: #f0f0ff;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;
+  overscroll-behavior: none;
+  overflow: hidden;
+}
+
+#__next, main { height: 100%; }
+
+/* ── Scrollable areas ─────────────────────── */
+.scroll-y {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* ── Sheet overlay ────────────────────────── */
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  z-index: 40;
+  animation: fadeIn 0.2s ease;
+}
+
+.sheet {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  background: #0f0f1a;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  border-radius: 24px 24px 0 0;
+  z-index: 50;
+  animation: slideUp 0.35s cubic-bezier(0.4,0,0.2,1);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.sheet-handle {
+  width: 36px; height: 4px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 2px;
+  margin: 12px auto 4px;
+  flex-shrink: 0;
+}
+
+/* ── Note masonry grid ────────────────────── */
+.notes-grid {
+  columns: 2;
+  column-gap: 10px;
+}
+
+.note-item {
+  break-inside: avoid;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+/* ── Escalation pulse for critical level ─── */
+.storm-critical {
+  animation: stormPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes stormPulse {
+  0%,100% { border-color: rgba(255,0,51,0.2); }
+  50%      { border-color: rgba(255,0,51,0.6); box-shadow: 0 0 20px rgba(255,0,51,0.2); }
+}
+
+/* ── FAB ──────────────────────────────────── */
+.fab {
+  position: fixed;
+  right: 20px;
+  bottom: calc(72px + var(--safe-bot));
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  color: #fff;
+  font-size: 24px;
+  border: none;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 28px rgba(139,92,246,0.45);
+  transition: transform 0.15s, box-shadow 0.15s;
+  z-index: 30;
+}
+.fab:active { transform: scale(0.92); box-shadow: 0 4px 14px rgba(139,92,246,0.35); }
+
+/* ── Inputs ───────────────────────────────── */
+.field-input {
+  width: 100%;
+  background: rgba(255,255,255,0.05);
+  border: 1.5px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  color: #f0f0ff;
+  font-size: 16px;
+  padding: 12px 14px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s;
+  resize: none;
+}
+.field-input:focus { border-color: #8b5cf6; }
+.field-input[type="datetime-local"] { color-scheme: dark; }
+
+/* ── Tag chip ──────────────────────────────── */
+.tag-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(139,92,246,0.15);
+  color: #a78bfa;
+  border: 1px solid rgba(139,92,246,0.3);
+  border-radius: 20px;
+  font-size: 11px; font-weight: 600;
+  padding: 3px 9px;
+}
+
+/* ── Keyframes ─────────────────────────────── */
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes toastIn {
+  from { transform: translateX(-50%) translateY(-16px); opacity: 0; }
+  to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+}

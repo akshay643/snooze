@@ -1,0 +1,15 @@
+{
+  "name": "Note⚡Alert",
+  "short_name": "NoteAlert",
+  "description": "Notes that remember. Reminders that refuse to be ignored.",
+  "start_url": "/notes",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#08080f",
+  "theme_color": "#08080f",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "categories": ["productivity", "utilities"]
+}
