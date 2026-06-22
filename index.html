@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SnoozeStorm">
+<meta name="theme-color" content="#0d0d14">
+<title>Snooze Storm</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon.svg">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+
+:root{
+  --bg:#0d0d14;
+  --surface:#16161f;
+  --surface2:#1e1e2d;
+  --border:#2a2a3d;
+  --text:#f0f0ff;
+  --muted:#6b6b8a;
+  --c0:#3b82f6;   /* calm */
+  --c1:#f59e0b;   /* elevated */
+  --c2:#ef4444;   /* urgent */
+  --c3:#ff0044;   /* critical */
+  --orange:#ff6b00;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bot: env(safe-area-inset-bottom, 0px);
+}
+
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',system-ui,sans-serif;overflow:hidden;overscroll-behavior:none}
+
+/* ── Layout ── */
+#app{position:relative;height:100%;width:100%;max-width:480px;margin:0 auto;overflow:hidden}
+.view{position:absolute;inset:0;display:flex;flex-direction:column;transition:transform .32s cubic-bezier(.4,0,.2,1),opacity .32s ease;will-change:transform,opacity}
+.view.hidden{transform:translateX(100%);opacity:0;pointer-events:none}
+.view.slide-left{transform:translateX(-40%);opacity:0;pointer-events:none}
+
+/* ── Header ── */
+.header{
+  padding: calc(var(--safe-top) + 16px) 20px 14px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:linear-gradient(180deg,var(--bg) 80%,transparent);
+  flex-shrink:0;z-index:2;position:relative;
+}
+.header h1{font-size:22px;font-weight:700;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px}
+.header h1 span.logo{font-size:26px}
+.header-actions{display:flex;gap:10px}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;transition:transform .12s,opacity .12s;-webkit-user-select:none;user-select:none}
+.btn:active{transform:scale(0.95);opacity:.85}
+.btn-icon{width:40px;height:40px;border-radius:50%;background:var(--surface2);color:var(--text);font-size:18px}
+.btn-primary{background:var(--orange);color:#fff;padding:14px 24px;width:100%;border-radius:14px;font-size:16px}
+.btn-secondary{background:var(--surface2);color:var(--text);padding:12px 20px;border-radius:14px;font-size:15px}
+.btn-danger{background:rgba(239,68,68,.12);color:#ef4444;padding:10px 16px;border-radius:12px;font-size:14px}
+.btn-ghost{background:transparent;color:var(--muted);padding:10px;border-radius:10px;font-size:15px}
+.btn-fab{
+  position:fixed;bottom:calc(28px + var(--safe-bot));right:24px;
+  width:60px;height:60px;border-radius:50%;
+  background:linear-gradient(135deg,#ff6b00,#ff8c42);
+  color:#fff;font-size:28px;
+  box-shadow:0 8px 32px rgba(255,107,0,.4);z-index:20;
+  border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:transform .15s,box-shadow .15s;
+}
+.btn-fab:active{transform:scale(.92);box-shadow:0 4px 16px rgba(255,107,0,.3)}
+
+/* ── Cards ── */
+.scroll-area{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 16px calc(100px + var(--safe-bot));-webkit-overflow-scrolling:touch}
+.reminder-card{
+  background:var(--surface);border-radius:18px;padding:16px;margin-bottom:12px;
+  border:1px solid var(--border);position:relative;overflow:hidden;
+  transition:transform .15s;cursor:pointer;
+}
+.reminder-card:active{transform:scale(.98)}
+.reminder-card::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:4px 0 0 4px;
+  background:var(--level-color, var(--c0));
+}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.card-task{font-size:16px;font-weight:600;line-height:1.3;flex:1;padding-right:10px}
+.card-delete{background:none;border:none;color:var(--muted);font-size:18px;padding:0;cursor:pointer;opacity:.7;flex-shrink:0;line-height:1}
+.card-meta{display:flex;align-items:center;gap:10px}
+.level-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.5px;text-transform:uppercase;
+  background:color-mix(in srgb, var(--level-color, var(--c0)) 18%, transparent);
+  color:var(--level-color, var(--c0));
+}
+.countdown{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.countdown.overdue{color:var(--c2)}
+.verify-badge{
+  font-size:11px;color:var(--muted);background:var(--surface2);
+  padding:3px 9px;border-radius:20px;margin-left:auto;
+}
+
+/* level css vars per escalation */
+[data-level="0"]{--level-color:var(--c0)}
+[data-level="1"]{--level-color:var(--c1)}
+[data-level="2"]{--level-color:var(--c2)}
+[data-level="3"]{--level-color:var(--c3);animation:pulse-card 1.5s ease-in-out infinite}
+
+@keyframes pulse-card{
+  0%,100%{border-color:var(--border)}
+  50%{border-color:rgba(255,0,68,.4)}
+}
+
+/* ── Empty state ── */
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px;text-align:center}
+.empty-icon{font-size:72px;opacity:.4}
+.empty h2{font-size:20px;font-weight:700}
+.empty p{font-size:15px;color:var(--muted);line-height:1.5}
+
+/* ── Add sheet ── */
+#view-add{background:var(--bg);padding-top:0}
+.sheet-header{
+  padding:calc(var(--safe-top) + 16px) 20px 14px;
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+}
+.sheet-header h2{font-size:18px;font-weight:700}
+.form-body{flex:1;overflow-y:auto;padding:4px 20px calc(40px + var(--safe-bot));-webkit-overflow-scrolling:touch}
+.field{margin-bottom:22px}
+.field label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+.field input,.field textarea{
+  width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:13px;
+  color:var(--text);font-size:16px;padding:13px 15px;outline:none;
+  font-family:inherit;transition:border-color .15s;resize:none;
+}
+.field input:focus,.field textarea:focus{border-color:var(--orange)}
+.field input[type="datetime-local"]{color-scheme:dark}
+.field textarea{min-height:80px;line-height:1.5}
+.type-selector{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.type-chip{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  background:var(--surface2);border:1.5px solid var(--border);border-radius:13px;
+  padding:12px 8px;cursor:pointer;transition:all .15s;text-align:center;
+}
+.type-chip input{display:none}
+.type-chip .chip-icon{font-size:24px}
+.type-chip .chip-label{font-size:12px;font-weight:600;color:var(--muted)}
+.type-chip:has(input:checked){background:rgba(255,107,0,.12);border-color:var(--orange)}
+.type-chip:has(input:checked) .chip-label{color:var(--orange)}
+.form-actions{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+
+/* ── Verify view ── */
+#view-verify{background:var(--bg)}
+.verify-hero{
+  flex-shrink:0;padding:calc(var(--safe-top) + 60px) 24px 32px;
+  text-align:center;
+}
+.verify-level-ring{
+  width:88px;height:88px;border-radius:50%;border:3px solid var(--level-color,var(--c0));
+  display:flex;align-items:center;justify-content:center;
+  font-size:40px;margin:0 auto 20px;
+  background:color-mix(in srgb, var(--level-color, var(--c0)) 10%, transparent);
+}
+.verify-task{font-size:22px;font-weight:700;line-height:1.3;margin-bottom:8px}
+.verify-prompt{font-size:15px;color:var(--muted);margin-top:6px}
+.verify-body{flex:1;overflow-y:auto;padding:0 24px calc(40px + var(--safe-bot));display:flex;flex-direction:column;gap:16px}
+.verify-input{
+  width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:14px;
+  color:var(--text);font-size:17px;padding:15px;outline:none;font-family:inherit;transition:border-color .15s;
+}
+.verify-input:focus{border-color:var(--level-color,var(--c0))}
+.photo-capture{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  background:var(--surface2);border:2px dashed var(--border);border-radius:18px;
+  padding:32px;cursor:pointer;transition:border-color .15s;
+}
+.photo-capture:hover{border-color:var(--orange)}
+.photo-capture input{display:none}
+.photo-capture .photo-icon{font-size:48px;opacity:.7}
+.photo-capture p{font-size:14px;color:var(--muted)}
+.photo-preview{width:100%;border-radius:16px;max-height:220px;object-fit:cover;display:none}
+.verify-actions{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+
+/* ── Toast / banner ── */
+.toast{
+  position:fixed;top:calc(var(--safe-top) + 12px);left:50%;transform:translateX(-50%) translateY(-120%);
+  background:#1e1e2d;border:1px solid var(--border);color:var(--text);
+  padding:12px 20px;border-radius:14px;font-size:14px;font-weight:500;
+  white-space:nowrap;z-index:999;transition:transform .3s cubic-bezier(.4,0,.2,1);
+  max-width:calc(100vw - 40px);white-space:normal;text-align:center;
+  box-shadow:0 8px 32px rgba(0,0,0,.4);
+}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.success{border-color:rgba(52,211,153,.4);color:#34d399}
+.toast.error{border-color:rgba(239,68,68,.4);color:#ef4444}
+
+/* ── Install banner ── */
+.install-banner{
+  margin:0 16px 12px;background:linear-gradient(135deg,rgba(255,107,0,.1),rgba(255,140,66,.08));
+  border:1px solid rgba(255,107,0,.25);border-radius:16px;padding:14px 16px;
+  display:flex;align-items:flex-start;gap:12px;
+}
+.install-banner .install-icon{font-size:26px;flex-shrink:0;margin-top:2px}
+.install-banner-text{flex:1}
+.install-banner-text strong{display:block;font-size:14px;font-weight:700;margin-bottom:3px}
+.install-banner-text p{font-size:12px;color:var(--muted);line-height:1.4}
+.install-banner-close{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:0;line-height:1;flex-shrink:0}
+
+/* ── Permission prompt ── */
+.perm-banner{
+  margin:0 16px 12px;background:var(--surface);border:1px solid var(--border);
+  border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:12px;
+}
+.perm-banner .perm-icon{font-size:22px;flex-shrink:0}
+.perm-banner-text{flex:1;font-size:13px}
+.perm-banner-text strong{display:block;font-weight:700;margin-bottom:2px;font-size:14px}
+.perm-banner-text p{color:var(--muted)}
+.btn-perm{background:var(--orange);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;padding:8px 14px;cursor:pointer;flex-shrink:0;white-space:nowrap}
+
+/* ── Completed section ── */
+.section-label{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;padding:4px 4px 8px}
+.reminder-card.completed{opacity:.45}
+.reminder-card.completed .card-task{text-decoration:line-through}
+
+/* ── Misc ── */
+.divider{height:1px;background:var(--border);margin:8px 0}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ═══════════════════════════════════════════
+       HOME VIEW
+  ═══════════════════════════════════════════ -->
+  <div class="view" id="view-home">
+    <div class="header">
+      <h1><span class="logo">⛈️</span> Snooze Storm</h1>
+      <div class="header-actions">
+        <button class="btn btn-icon" id="btn-settings" title="Settings" aria-label="Settings">⚙️</button>
+      </div>
+    </div>
+
+    <div id="install-banner" class="install-banner" style="display:none">
+      <span class="install-icon">📲</span>
+      <div class="install-banner-text">
+        <strong>Add to Home Screen for push alerts</strong>
+        <p>Tap <strong>Share</strong> → <strong>Add to Home Screen</strong> to enable notifications when app is closed (iOS 16.4+)</p>
+      </div>
+      <button class="install-banner-close" id="dismiss-install" aria-label="Dismiss">✕</button>
+    </div>
+
+    <div id="perm-banner" class="perm-banner" style="display:none">
+      <span class="perm-icon">🔔</span>
+      <div class="perm-banner-text">
+        <strong>Enable notifications</strong>
+        <p>So Snooze Storm can actually storm you.</p>
+      </div>
+      <button class="btn-perm" id="btn-grant-perm">Allow</button>
+    </div>
+
+    <div class="scroll-area" id="home-scroll">
+      <div id="empty-state" class="empty" style="display:none">
+        <div class="empty-icon">🌤️</div>
+        <h2>All clear</h2>
+        <p>No active reminders. Tap <strong>+</strong> to add one that will absolutely refuse to leave you alone.</p>
+      </div>
+      <div id="active-list"></div>
+      <div id="done-section" style="display:none">
+        <div class="divider"></div>
+        <div class="section-label">Completed</div>
+        <div id="done-list"></div>
+      </div>
+    </div>
+
+    <button class="btn-fab" id="btn-add" aria-label="Add reminder">+</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       ADD VIEW
+  ═══════════════════════════════════════════ -->
+  <div class="view hidden" id="view-add">
+    <div class="sheet-header">
+      <button class="btn btn-ghost" id="btn-cancel-add">Cancel</button>
+      <h2>New Reminder</h2>
+      <div style="width:60px"></div>
+    </div>
+    <div class="form-body">
+      <form id="add-form">
+        <div class="field">
+          <label for="task-input">What do you need to do?</label>
+          <textarea id="task-input" placeholder="e.g. Call the dentist, Submit the report…" rows="3" required maxlength="200"></textarea>
+        </div>
+
+        <div class="field">
+          <label for="time-input">When should I start bugging you?</label>
+          <input type="datetime-local" id="time-input" required>
+        </div>
+
+        <div class="field">
+          <label>Proof of completion</label>
+          <div class="type-selector">
+            <label class="type-chip">
+              <input type="radio" name="verify-type" value="keyword" checked>
+              <span class="chip-icon">⌨️</span>
+              <span class="chip-label">Keyword</span>
+            </label>
+            <label class="type-chip">
+              <input type="radio" name="verify-type" value="photo">
+              <span class="chip-icon">📸</span>
+              <span class="chip-label">Photo</span>
+            </label>
+            <label class="type-chip">
+              <input type="radio" name="verify-type" value="question">
+              <span class="chip-icon">❓</span>
+              <span class="chip-label">Question</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="field" id="verify-data-field">
+          <label id="verify-data-label">Magic word to type when done</label>
+          <input type="text" id="verify-data-input" placeholder="e.g. DONE" maxlength="100">
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">⚡ Set the Storm</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       VERIFY VIEW
+  ═══════════════════════════════════════════ -->
+  <div class="view hidden" id="view-verify">
+    <div class="verify-hero" id="verify-hero">
+      <div class="verify-level-ring" id="verify-ring">⚡</div>
+      <div class="verify-task" id="verify-task-name">Task name</div>
+      <div class="verify-prompt" id="verify-prompt">Prove you did it to dismiss this storm.</div>
+    </div>
+    <div class="verify-body">
+      <!-- keyword -->
+      <div id="verify-keyword-block" style="display:none">
+        <input class="verify-input" type="text" id="verify-keyword-input" placeholder="Type the magic word…" autocomplete="off" autocorrect="off" autocapitalize="off">
+        <div style="font-size:12px;color:var(--muted);margin-top:6px;padding:0 2px">Hint: it's the word you set when creating this reminder.</div>
+      </div>
+      <!-- photo -->
+      <div id="verify-photo-block" style="display:none">
+        <label class="photo-capture" id="photo-capture-label">
+          <input type="file" accept="image/*" capture="environment" id="verify-photo-input">
+          <span class="photo-icon">📷</span>
+          <p>Tap to take a photo as proof</p>
+        </label>
+        <img class="photo-preview" id="photo-preview" alt="proof">
+      </div>
+      <!-- question -->
+      <div id="verify-question-block" style="display:none">
+        <div id="verify-question-text" style="font-size:15px;color:var(--muted);margin-bottom:10px;line-height:1.5;font-weight:500"></div>
+        <input class="verify-input" type="text" id="verify-answer-input" placeholder="Your answer…">
+      </div>
+
+      <div class="verify-actions">
+        <button class="btn btn-primary" id="btn-verify-confirm">✓ Mark Complete</button>
+        <button class="btn btn-secondary" id="btn-snooze-5">💤 Snooze 5 min</button>
+        <button class="btn btn-ghost" id="btn-verify-cancel">Not yet</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+// ── Utilities ──────────────────────────────────────────────
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function formatCountdown(ms) {
+  if (ms <= 0) return { text: 'OVERDUE', overdue: true };
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return { text: `${s}s`, overdue: false };
+  const m = Math.floor(s / 60);
+  if (m < 60) return { text: `${m}m ${s % 60}s`, overdue: false };
+  const h = Math.floor(m / 60);
+  if (h < 24) return { text: `${h}h ${m % 60}m`, overdue: false };
+  const d = Math.floor(h / 24);
+  return { text: `${d}d ${h % 24}h`, overdue: false };
+}
+
+function levelEmoji(lvl) {
+  return ['🔵', '🟡', '🔴', '🚨'][Math.min(lvl, 3)];
+}
+function levelLabel(lvl) {
+  return ['Calm', 'Elevated', 'Urgent', 'CRITICAL'][Math.min(lvl, 3)];
+}
+function verifyIcon(type) {
+  return { keyword: '⌨️', photo: '📸', question: '❓' }[type] || '✓';
+}
+
+let toastTimer = null;
+function showToast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast${type ? ' ' + type : ''} show`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+}
+
+// ── State ──────────────────────────────────────────────────
+const STATE_KEY = 'ss-reminders-v3';
+let reminders = [];
+
+function loadState() {
+  try { reminders = JSON.parse(localStorage.getItem(STATE_KEY) || '[]'); }
+  catch { reminders = []; }
+}
+function saveState() {
+  localStorage.setItem(STATE_KEY, JSON.stringify(reminders));
+}
+function getReminder(id) { return reminders.find(r => r.id === id); }
+function activeReminders() { return reminders.filter(r => !r.completed); }
+function doneReminders() { return reminders.filter(r => r.completed); }
+
+// ── Service Worker ─────────────────────────────────────────
+let swReady = false;
+
+async function registerSW() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
+    swReady = true;
+
+    // Handle messages from SW
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data.type === 'VERIFY') showVerifyView(e.data.id);
+      if (e.data.type === 'SNOOZED') {
+        const r = getReminder(e.data.id);
+        if (r) showToast(`"${r.task.slice(0,30)}" snoozed 5 min 💤`);
+        renderHome();
+      }
+    });
+
+    // Re-register all active reminders with SW (SW loses timers on restart)
+    reschedulePendingWithSW();
+  } catch (err) {
+    console.warn('SW registration failed:', err);
+  }
+}
+
+function postSW(msg) {
+  if (!navigator.serviceWorker.controller) return;
+  navigator.serviceWorker.controller.postMessage(msg);
+}
+
+function scheduleWithSW(r) {
+  postSW({ type: 'SCHEDULE', reminder: { id: r.id, task: r.task, dueTime: r.dueTime, escalationLevel: r.escalationLevel } });
+}
+
+function reschedulePendingWithSW() {
+  const pending = activeReminders();
+  if (pending.length) postSW({ type: 'RESCHEDULE_BATCH', reminders: pending.map(r => ({ id: r.id, task: r.task, dueTime: r.dueTime, escalationLevel: r.escalationLevel })) });
+}
+
+// ── Notification permission ────────────────────────────────
+async function requestPermission() {
+  if (!('Notification' in window)) {
+    showToast('Notifications not supported in this browser', 'error');
+    return false;
+  }
+  const result = await Notification.requestPermission();
+  renderPermBanner();
+  if (result === 'granted') {
+    showToast('Notifications enabled! 🔔', 'success');
+    return true;
+  }
+  showToast('Permission denied — notifications won\'t work', 'error');
+  return false;
+}
+
+function permissionGranted() {
+  return 'Notification' in window && Notification.permission === 'granted';
+}
+
+// ── iOS install detection ──────────────────────────────────
+function isStandalone() {
+  return window.navigator.standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches;
+}
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+function showInstallBanner() {
+  const banner = document.getElementById('install-banner');
+  const dismissed = localStorage.getItem('ss-install-dismissed');
+  if (!dismissed && isIOS() && !isStandalone()) {
+    banner.style.display = 'flex';
+  }
+}
+function renderPermBanner() {
+  const banner = document.getElementById('perm-banner');
+  if ('Notification' in window && Notification.permission === 'default') {
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// ── CRUD ──────────────────────────────────────────────────
+function addReminder({ task, dueTime, verificationType, verificationData }) {
+  const r = {
+    id: uid(),
+    task,
+    dueTime,
+    verificationType,
+    verificationData,
+    escalationLevel: 0,
+    completed: false,
+    completedAt: null,
+    createdAt: Date.now(),
+    snoozedCount: 0,
+  };
+  reminders.unshift(r);
+  saveState();
+  scheduleWithSW(r);
+  return r;
+}
+
+function completeReminder(id) {
+  const r = getReminder(id);
+  if (!r) return;
+  r.completed = true;
+  r.completedAt = Date.now();
+  saveState();
+  postSW({ type: 'COMPLETE', id });
+}
+
+function deleteReminder(id) {
+  postSW({ type: 'CANCEL', id });
+  reminders = reminders.filter(r => r.id !== id);
+  saveState();
+}
+
+function snoozeReminder(id, ms = 5 * 60000) {
+  const r = getReminder(id);
+  if (!r) return;
+  r.dueTime = Date.now() + ms;
+  r.snoozedCount = (r.snoozedCount || 0) + 1;
+  saveState();
+  scheduleWithSW(r);
+}
+
+// ── Views ──────────────────────────────────────────────────
+const VIEWS = ['view-home', 'view-add', 'view-verify'];
+
+function showView(id, slideFrom = 'right') {
+  VIEWS.forEach(v => {
+    const el = document.getElementById(v);
+    if (v === id) {
+      el.classList.remove('hidden', 'slide-left');
+    } else if (!el.classList.contains('hidden')) {
+      el.classList.add(slideFrom === 'right' ? 'slide-left' : 'hidden');
+      el.classList.remove('hidden');
+      if (slideFrom === 'left') { el.classList.add('hidden'); el.classList.remove('slide-left'); }
+    }
+  });
+  // ensure target is visible
+  document.getElementById(id).classList.remove('hidden', 'slide-left');
+}
+
+// ── Home view ──────────────────────────────────────────────
+let clockTick = null;
+
+function renderHome() {
+  const active = activeReminders();
+  const done = doneReminders();
+
+  document.getElementById('empty-state').style.display = active.length === 0 ? 'flex' : 'none';
+
+  document.getElementById('active-list').innerHTML = active
+    .sort((a, b) => a.dueTime - b.dueTime)
+    .map(r => cardHTML(r))
+    .join('');
+
+  const doneSection = document.getElementById('done-section');
+  if (done.length) {
+    doneSection.style.display = 'block';
+    document.getElementById('done-list').innerHTML = done
+      .sort((a, b) => b.completedAt - a.completedAt)
+      .slice(0, 5)
+      .map(r => cardHTML(r))
+      .join('');
+  } else {
+    doneSection.style.display = 'none';
+  }
+}
+
+function cardHTML(r) {
+  const lvl = r.completed ? 0 : Math.min(r.escalationLevel, 3);
+  const { text, overdue } = formatCountdown(r.dueTime - Date.now());
+  const countdownClass = overdue && !r.completed ? ' overdue' : '';
+  const timeStr = r.completed
+    ? `✓ Done ${new Date(r.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : (overdue ? `⚠ ${text}` : `in ${text}`);
+
+  return `<div class="reminder-card${r.completed ? ' completed' : ''}" data-level="${lvl}" data-id="${r.id}">
+    <div class="card-head">
+      <div class="card-task">${escHtml(r.task)}</div>
+      <button class="card-delete" data-delete="${r.id}" aria-label="Delete">✕</button>
+    </div>
+    <div class="card-meta">
+      <span class="level-badge">${levelEmoji(lvl)} ${levelLabel(lvl)}</span>
+      <span class="countdown${countdownClass}" data-id="${r.id}">${timeStr}</span>
+      <span class="verify-badge">${verifyIcon(r.verificationType)}</span>
+    </div>
+  </div>`;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function startClock() {
+  if (clockTick) clearInterval(clockTick);
+  clockTick = setInterval(() => {
+    document.querySelectorAll('.countdown[data-id]').forEach(el => {
+      const r = getReminder(el.dataset.id);
+      if (!r || r.completed) return;
+      const { text, overdue } = formatCountdown(r.dueTime - Date.now());
+      el.textContent = overdue ? `⚠ ${text}` : `in ${text}`;
+      el.className = `countdown${overdue ? ' overdue' : ''}`;
+    });
+  }, 1000);
+}
+
+// ── Add view ──────────────────────────────────────────────
+function initAddView() {
+  // Default time: now + 30 min
+  const soon = new Date(Date.now() + 30 * 60000);
+  const local = new Date(soon - soon.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  document.getElementById('time-input').value = local;
+  document.getElementById('task-input').value = '';
+  document.getElementById('verify-data-input').value = '';
+  document.querySelectorAll('input[name="verify-type"]')[0].checked = true;
+  updateVerifyDataLabel();
+}
+
+function updateVerifyDataLabel() {
+  const type = document.querySelector('input[name="verify-type"]:checked')?.value || 'keyword';
+  const labels = {
+    keyword: ['Magic word to type when done', 'e.g. DONE or CALLED or SENT'],
+    photo: null,
+    question: ['Question I must answer to confirm', 'e.g. Where did you file it?'],
+  };
+  const field = document.getElementById('verify-data-field');
+  if (type === 'photo') {
+    field.style.display = 'none';
+  } else {
+    field.style.display = 'block';
+    document.getElementById('verify-data-label').textContent = labels[type][0];
+    document.getElementById('verify-data-input').placeholder = labels[type][1];
+  }
+}
+
+// ── Verify view ───────────────────────────────────────────
+let verifyingId = null;
+let photoDataURL = null;
+
+function showVerifyView(id) {
+  const r = getReminder(id);
+  if (!r || r.completed) { showView('view-home', 'left'); return; }
+
+  verifyingId = id;
+  photoDataURL = null;
+  const lvl = Math.min(r.escalationLevel, 3);
+
+  const hero = document.getElementById('verify-hero');
+  hero.setAttribute('data-level', lvl);
+  document.getElementById('verify-ring').textContent = ['⏰', '⚡', '🔥', '🚨'][lvl];
+  document.getElementById('verify-task-name').textContent = r.task;
+
+  const prompts = [
+    'Prove you did it to clear this reminder.',
+    'Still here? Show me the proof.',
+    'This is getting serious. Complete it NOW.',
+    'FINAL WARNING. Complete this immediately.',
+  ];
+  document.getElementById('verify-prompt').textContent = prompts[lvl];
+
+  ['keyword', 'photo', 'question'].forEach(t => {
+    document.getElementById(`verify-${t}-block`).style.display = r.verificationType === t ? 'block' : 'none';
+  });
+
+  if (r.verificationType === 'keyword') {
+    const inp = document.getElementById('verify-keyword-input');
+    inp.value = '';
+    inp.placeholder = r.verificationData ? `Type: "${r.verificationData}"` : 'Type to confirm…';
+  }
+  if (r.verificationType === 'question') {
+    document.getElementById('verify-question-text').textContent = r.verificationData || 'Can you confirm this is done?';
+    document.getElementById('verify-answer-input').value = '';
+  }
+  if (r.verificationType === 'photo') {
+    document.getElementById('verify-photo-input').value = '';
+    document.getElementById('photo-preview').style.display = 'none';
+    document.getElementById('photo-capture-label').style.display = 'flex';
+  }
+
+  // apply level color
+  const ring = document.getElementById('verify-ring');
+  const colors = ['var(--c0)', 'var(--c1)', 'var(--c2)', 'var(--c3)'];
+  ring.style.setProperty('--level-color', colors[lvl]);
+  hero.style.setProperty('--level-color', colors[lvl]);
+
+  showView('view-verify');
+}
+
+function verifyAndComplete() {
+  const r = getReminder(verifyingId);
+  if (!r) return;
+
+  if (r.verificationType === 'keyword') {
+    const input = document.getElementById('verify-keyword-input').value.trim();
+    const expected = r.verificationData?.trim().toLowerCase();
+    if (expected && input.toLowerCase() !== expected) {
+      showToast(`Type exactly: "${r.verificationData}"`, 'error');
+      document.getElementById('verify-keyword-input').focus();
+      return;
+    }
+    if (!input) { showToast('Type the magic word first', 'error'); return; }
+  }
+
+  if (r.verificationType === 'photo') {
+    if (!photoDataURL) { showToast('Take a photo first 📸', 'error'); return; }
+  }
+
+  if (r.verificationType === 'question') {
+    const answer = document.getElementById('verify-answer-input').value.trim();
+    if (!answer) { showToast('Answer the question first', 'error'); return; }
+  }
+
+  completeReminder(verifyingId);
+  showToast('✓ Done! Storm cleared.', 'success');
+  showView('view-home', 'left');
+  renderHome();
+}
+
+// ── Event wiring ───────────────────────────────────────────
+function wireEvents() {
+  // FAB → add view
+  document.getElementById('btn-add').addEventListener('click', () => {
+    initAddView();
+    showView('view-add');
+  });
+
+  // cancel add
+  document.getElementById('btn-cancel-add').addEventListener('click', () => {
+    showView('view-home', 'left');
+  });
+
+  // verify type change
+  document.querySelectorAll('input[name="verify-type"]').forEach(el => {
+    el.addEventListener('change', updateVerifyDataLabel);
+  });
+
+  // add form submit
+  document.getElementById('add-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const task = document.getElementById('task-input').value.trim();
+    const timeStr = document.getElementById('time-input').value;
+    const type = document.querySelector('input[name="verify-type"]:checked')?.value || 'keyword';
+    const data = document.getElementById('verify-data-input').value.trim();
+
+    if (!task) { showToast('Add a task description', 'error'); return; }
+    if (!timeStr) { showToast('Pick a time', 'error'); return; }
+
+    const dueTime = new Date(timeStr).getTime();
+    if (isNaN(dueTime)) { showToast('Invalid time', 'error'); return; }
+
+    if (!permissionGranted()) {
+      const granted = await requestPermission();
+      if (!granted) showToast('Reminder saved, but notifications are disabled', 'error');
+    }
+
+    const r = addReminder({ task, dueTime, verificationType: type, verificationData: data });
+    showView('view-home', 'left');
+    renderHome();
+    showToast('Storm set ⛈️ — it will not stop until you\'re done');
+  });
+
+  // card clicks (event delegation on home scroll)
+  document.getElementById('home-scroll').addEventListener('click', e => {
+    const deleteBtn = e.target.closest('[data-delete]');
+    if (deleteBtn) {
+      const id = deleteBtn.dataset.delete;
+      deleteReminder(id);
+      renderHome();
+      showToast('Reminder deleted');
+      return;
+    }
+    const card = e.target.closest('.reminder-card');
+    if (card && !card.classList.contains('completed')) {
+      showVerifyView(card.dataset.id);
+    }
+  });
+
+  // verify confirm
+  document.getElementById('btn-verify-confirm').addEventListener('click', verifyAndComplete);
+
+  // snooze 5 from verify view
+  document.getElementById('btn-snooze-5').addEventListener('click', () => {
+    snoozeReminder(verifyingId, 5 * 60000);
+    showView('view-home', 'left');
+    showToast('Snoozed 5 min 💤 — I\'ll be back');
+    renderHome();
+  });
+
+  // cancel verify
+  document.getElementById('btn-verify-cancel').addEventListener('click', () => {
+    showView('view-home', 'left');
+  });
+
+  // photo input
+  document.getElementById('verify-photo-input').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      photoDataURL = ev.target.result;
+      const preview = document.getElementById('photo-preview');
+      preview.src = photoDataURL;
+      preview.style.display = 'block';
+      document.getElementById('photo-capture-label').style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // install banner dismiss
+  document.getElementById('dismiss-install').addEventListener('click', () => {
+    document.getElementById('install-banner').style.display = 'none';
+    localStorage.setItem('ss-install-dismissed', '1');
+  });
+
+  // notification permission grant
+  document.getElementById('btn-grant-perm').addEventListener('click', requestPermission);
+}
+
+// ── URL param: ?verify=id ──────────────────────────────────
+function handleURLParams() {
+  const params = new URLSearchParams(location.search);
+  const verifyId = params.get('verify');
+  if (verifyId) {
+    history.replaceState({}, '', location.pathname);
+    setTimeout(() => showVerifyView(verifyId), 150);
+  }
+}
+
+// ── Boot ──────────────────────────────────────────────────
+async function boot() {
+  loadState();
+  wireEvents();
+  renderHome();
+  startClock();
+  showInstallBanner();
+  renderPermBanner();
+  handleURLParams();
+  await registerSW();
+}
+
+boot();
+</script>
+</body>
+</html>
